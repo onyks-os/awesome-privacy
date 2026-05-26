@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-26T20:07:29Z",
+  "generatedAt": "2026-05-26T20:08:02Z",
   "processedShas": [
     "02125ec429ec1ce9c5acdec1604703cb058a7887",
     "02231fb0a59ee43f93c6d0143640284cb7587d71",
@@ -83,6 +83,7 @@
     "8428fdce3364820f6e573852b30c28b9050ed83f",
     "843a49181fb47e1800953fd8b1b5b65ff8041454",
     "874dbdacae9c71cea100c85dc2b05bd348d20173",
+    "88bc6299bfbaf786e134238c45ac4d9a6aa7de24",
     "88c0cb324458962c52691a05384aab459bf740b2",
     "8950c0b79c0fc336f579002466dcc2f8eaad43ea",
     "8c0cdf76b53040df0fe362941ca4a085d346ce8a",
@@ -235,6 +236,29 @@
     565
   ],
   "entries": [
+    {
+      "date": "2026-05-26",
+      "sha": "88bc6299bfbaf786e134238c45ac4d9a6aa7de24",
+      "pr": {
+        "number": 575,
+        "url": "https://github.com/lissy93/awesome-privacy/pull/575",
+        "author": "ltguillaume",
+        "authorAvatar": "https://avatars.githubusercontent.com/u/4777345?v=4"
+      },
+      "changes": {
+        "services": {
+          "removed": [
+            {
+              "name": "ScriptSafe",
+              "category": "Security Tools",
+              "section": "Browser Extensions"
+            }
+          ]
+        },
+        "sections": {},
+        "categories": {}
+      }
+    },
     {
       "date": "2026-05-26",
       "sha": "dc6bd7c8a78f3a9a054aa77327b040adf1ced610",
