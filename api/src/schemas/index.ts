@@ -155,14 +155,18 @@ export const GithubRepoSchema = z
       language: z.string(),
       topics: z.array(z.string()),
       license: z.string(),
+      licenseName: z.string(),
       isFork: z.boolean(),
       isArchived: z.boolean(),
+      forkParent: z.string(),
       createdAt: z.string(),
       updatedAt: z.string(),
+      pushedAt: z.string(),
       size: z.number(),
       starCount: z.number(),
       forksCount: z.number(),
       watchersCount: z.number(),
+      openIssues: z.number(),
     }),
     languages: z.record(z.number()),
     versions: z.array(
@@ -177,6 +181,7 @@ export const GithubRepoSchema = z
       z.object({
         username: z.string(),
         avatar: z.string(),
+        url: z.string(),
         contributions: z.number(),
       }),
     ),
@@ -192,6 +197,44 @@ export const GithubRepoSchema = z
     ),
   })
   .openapi('GithubRepo')
+
+// Repo security report, merges deps.dev scorecard with GitHub advisories
+export const SecurityReportSchema = z
+  .object({
+    repo: z.string(),
+    scorecard: z.object({
+      available: z.boolean(),
+      overallScore: z.number().nullable(),
+      generatedAt: z.string(),
+      checks: z.array(
+        z.object({
+          name: z.string(),
+          score: z.number(),
+          reason: z.string(),
+          url: z.string(),
+        }),
+      ),
+    }),
+    advisories: z.object({
+      count: z.number(),
+      items: z.array(
+        z.object({
+          ghsaId: z.string(),
+          cveId: z.string().nullable(),
+          summary: z.string(),
+          severity: z.string(),
+          cvssScore: z.number().nullable(),
+          publishedAt: z.string(),
+          url: z.string(),
+          firstPatchedVersion: z.string().nullable(),
+          vulnerableRange: z.string(),
+          isPatched: z.boolean(),
+        }),
+      ),
+    }),
+    fuzzed: z.boolean(),
+  })
+  .openapi('SecurityReport')
 
 export const DiscordInviteSchema = z
   .object({

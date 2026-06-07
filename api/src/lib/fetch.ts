@@ -16,6 +16,7 @@ const ALLOWED_HOSTS = new Set([
   'www.reddit.com',
   'endpoint.apivoid.com',
   'raw.githubusercontent.com',
+  'api.deps.dev',
 ])
 
 export interface FetchOpts {

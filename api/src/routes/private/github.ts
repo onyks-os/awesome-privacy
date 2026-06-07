@@ -1,6 +1,7 @@
 // GitHub repo info, aggregates info, languages, tags, contributors, commits
 import { createRoute, z } from '@hono/zod-openapi'
 import { fetchJson } from '@/lib/fetch'
+import { githubHeaders } from '@/lib/github'
 import { newApp } from '@/lib/openapi'
 import { ErrorResponse, GithubRepoSchema, Ok } from '@/schemas'
 
@@ -16,15 +17,18 @@ interface RepoInfo {
   homepage?: string
   language?: string
   topics?: string[]
-  license?: { spdx_id?: string }
+  license?: { spdx_id?: string; name?: string }
   fork?: boolean
   archived?: boolean
+  parent?: { full_name?: string }
   created_at?: string
   updated_at?: string
+  pushed_at?: string
   size?: number
   stargazers_count?: number
   forks_count?: number
   watchers_count?: number
+  open_issues_count?: number
 }
 
 interface Tag {
@@ -37,6 +41,7 @@ interface Tag {
 interface Contributor {
   login?: string
   avatar_url?: string
+  html_url?: string
   contributions?: number
 }
 
@@ -60,14 +65,18 @@ const mapInfo = (info: RepoInfo) => ({
   language: info.language ?? '',
   topics: info.topics ?? [],
   license: info.license?.spdx_id ?? '',
+  licenseName: info.license?.name ?? '',
   isFork: info.fork ?? false,
   isArchived: info.archived ?? false,
+  forkParent: info.parent?.full_name ?? '',
   createdAt: info.created_at ?? '',
   updatedAt: info.updated_at ?? '',
+  pushedAt: info.pushed_at ?? '',
   size: info.size ?? 0,
   starCount: info.stargazers_count ?? 0,
   forksCount: info.forks_count ?? 0,
   watchersCount: info.watchers_count ?? 0,
+  openIssues: info.open_issues_count ?? 0,
 })
 
 const mapVersion = (tag: Tag) => ({
@@ -80,6 +89,7 @@ const mapVersion = (tag: Tag) => ({
 const mapContributor = (person: Contributor) => ({
   username: person.login ?? '',
   avatar: person.avatar_url ?? '',
+  url: person.html_url ?? '',
   contributions: person.contributions ?? 0,
 })
 
@@ -91,15 +101,6 @@ const mapCommit = (commit: Commit) => ({
   authorUsername: commit.author?.login ?? '',
   authorAvatar: commit.author?.avatar_url ?? '',
 })
-
-const buildHeaders = (token?: string) => {
-  const headers: Record<string, string> = {
-    'User-Agent': 'awesome-privacy-api',
-    Accept: 'application/vnd.github.v3+json',
-  }
-  if (token) headers.Authorization = `token ${token}`
-  return headers
-}
 
 const route = createRoute({
   method: 'get',
@@ -119,7 +120,7 @@ const route = createRoute({
 app.openapi(route, async (c) => {
   const { owner, repo } = c.req.valid('param')
   const slug = `${owner}/${repo}`
-  const headers = buildHeaders(c.env.GITHUB_TOKEN)
+  const headers = githubHeaders(c.env.GITHUB_TOKEN)
   const data = await c.var.storage.fetch(
     `gh:${slug}`,
     SUCCESS_TTL,
@@ -130,7 +131,7 @@ app.openapi(route, async (c) => {
         fetchJson<RepoInfo>(base, { headers }),
         fetchJson<Record<string, number>>(`${base}/languages`, { headers }),
         fetchJson<Tag[]>(`${base}/tags`, { headers }),
-        fetchJson<Contributor[]>(`${base}/contributors`, { headers }),
+        fetchJson<Contributor[]>(`${base}/contributors?per_page=100`, { headers }),
         fetchJson<Commit[]>(`${base}/commits`, { headers }),
       ])
       return {

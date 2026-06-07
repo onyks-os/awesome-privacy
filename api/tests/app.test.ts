@@ -67,6 +67,11 @@ describe('auth', () => {
     })
     expect(res.status).toBe(401)
   })
+
+  it('security enrich route requires auth', async () => {
+    const res = await hit('/v1/enrich/security/jquery/jquery')
+    expect(res.status).toBe(401)
+  })
 })
 
 describe('mcp', () => {
