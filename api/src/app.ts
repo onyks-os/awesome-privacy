@@ -26,14 +26,8 @@ import security from '@/routes/private/security'
 import mcp from '@/routes/mcp'
 
 const buildPublic = () => {
-  // Public routes, CORS open, rate limited, cacheable
+  // Public browse routes, shared middleware is applied at the app level
   const pub = newApp()
-  pub.use('*', cors({ origin: '*' }))
-  pub.use('*', rateLimit())
-  pub.use('*', async (c, next) => {
-    await next()
-    c.header('Cache-Control', 'public, s-maxage=300')
-  })
   pub.route('/', services)
   pub.route('/', categoriesRoute)
   pub.route('/', searchRoute)
@@ -68,6 +62,19 @@ export const buildApp = () => {
     await next()
   })
 
+  // CORS everywhere; rate limiting and edge caching are for public routes only,
+  // authenticated /enrich/* requests are exempt from both
+  app.use('*', cors({ origin: '*' }))
+  const limiter = rateLimit()
+  app.use('/v1/*', (c, next) =>
+    c.req.path.startsWith('/v1/enrich') ? next() : limiter(c, next),
+  )
+  app.use('/v1/*', async (c, next) => {
+    if (c.req.path.startsWith('/v1/enrich')) return next()
+    await next()
+    c.header('Cache-Control', 'public, s-maxage=300')
+  })
+
   app.route('/v1', buildPublic())
   app.route('/v1', buildPrivate())
   app.route('/v1', mcp)
@@ -100,7 +107,9 @@ Then, add the \`Authorization: Bearer <your-token>\` header when accessing the e
 <summary>Caching</summary>
 
 Some responses are cached to reduce load on upstream services.
-When configured, successful enrichment data results are put in KV for upto 7 days.
+When configured, successful enrichment results are cached in KV and served while fresh
+(from a week up to 90 days, depending on the endpoint). Stale entries are refreshed on
+demand, falling back to the cached copy if the upstream is unavailable.
 </details>
 
 <details>

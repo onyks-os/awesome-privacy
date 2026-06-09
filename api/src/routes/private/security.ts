@@ -2,13 +2,13 @@
 import { createRoute, z } from '@hono/zod-openapi'
 import { fetchJson } from '@/lib/fetch'
 import { githubHeaders } from '@/lib/github'
+import { freshSeconds } from '@/lib/cache/freshness'
 import { newApp } from '@/lib/openapi'
 import { ErrorResponse, Ok, SecurityReportSchema } from '@/schemas'
 
 const app = newApp()
 
-const SUCCESS_TTL = 7 * 24 * 60 * 60
-const NEGATIVE_TTL = 60 * 60
+const FRESH_TTL = freshSeconds('security')
 
 interface Check {
   name?: string
@@ -24,6 +24,8 @@ interface Project {
 
 interface Vuln {
   vulnerable_version_range?: string | null
+  // Repo advisories carry the fix here, the global advisory db uses first_patched_version
+  patched_versions?: string | null
   first_patched_version?: { identifier?: string } | null
 }
 
@@ -63,7 +65,9 @@ const mapAdvisory = (a: Advisory) => {
     ),
   ]
   const vulnerableRange = ranges.join('; ')
-  const explicit = vulns.map((v) => v.first_patched_version?.identifier).find(Boolean)
+  const explicit = vulns
+    .map((v) => v.patched_versions?.trim() || v.first_patched_version?.identifier)
+    .find(Boolean)
   const firstPatchedVersion = explicit ?? deriveFix(ranges)
   return {
     ghsaId: a.ghsa_id ?? '',
@@ -133,18 +137,13 @@ const route = createRoute({
 app.openapi(route, async (c) => {
   const { owner, repo } = c.req.valid('param')
   const slug = `${owner}/${repo}`
-  const data = await c.var.storage.fetch(
-    `sec:${slug}`,
-    SUCCESS_TTL,
-    NEGATIVE_TTL,
-    async () => {
-      const [posture, advisories] = await Promise.all([
-        getPosture(slug),
-        getAdvisories(slug, c.env.GITHUB_TOKEN),
-      ])
-      return { repo: slug, ...posture, advisories }
-    },
-  )
+  const data = await c.var.storage.fetch(`sec:${slug}`, FRESH_TTL, async () => {
+    const [posture, advisories] = await Promise.all([
+      getPosture(slug),
+      getAdvisories(slug, c.env.GITHUB_TOKEN),
+    ])
+    return { repo: slug, ...posture, advisories }
+  })
   return c.json(data, 200)
 })
 

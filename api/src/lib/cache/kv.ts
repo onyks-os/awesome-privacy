@@ -1,17 +1,18 @@
 /* Workers KV backed Storage */
-import type { Storage } from '@/lib/cache'
+import type { Storage, StoredEntry } from '@/lib/cache'
 import { wrapFetch } from '@/lib/cache'
 
 export const kvStorage = (kv: KVNamespace): Storage => {
   const storage: Storage = {
     async get<T>(key: string) {
-      const value = await kv.get(key, 'json')
-      return (value as T) ?? null
+      return (await kv.get<StoredEntry<T>>(key, 'json')) ?? null
     },
-    async set<T>(key: string, value: T, ttlSec: number) {
-      await kv.put(key, JSON.stringify(value), {
-        expirationTtl: Math.max(ttlSec, 60),
-      })
+    async set<T>(key: string, value: T) {
+      // No expirationTtl, entries are kept indefinitely
+      await kv.put(
+        key,
+        JSON.stringify({ value, cachedAt: Date.now() } satisfies StoredEntry<T>),
+      )
     },
     fetch: async () => {
       throw new Error('uninit')

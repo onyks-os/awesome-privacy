@@ -163,16 +163,28 @@ def fetch_all_data(owner, repo, token):
         data["commit_count"] = None
         data["ai_commit_count"] = None
 
-    alerts = gh_get(
-        f"/repos/{owner}/{repo}/dependabot/alerts", token,
-        {"state": "open", "severity": "critical,high", "per_page": 1},
-    )
-    data["has_security_alerts"] = bool(alerts) if alerts is not None else None
-
     languages = gh_get(f"/repos/{owner}/{repo}/languages", token)
     data["languages"] = list(languages.keys()) if languages is not None else None
 
+    report = _enrich_get(f"security/{owner}/{repo}")
+    data["unpatched_advisories"] = _count_unpatched_advisories(report)
+
     return data
+
+
+SECURITY_SEVERITIES = {"medium", "high", "critical"}
+
+
+def _count_unpatched_advisories(report):
+    """Count open advisories of medium severity or above that are unpatched, or None."""
+    if not report:
+        return None
+    items = (report.get("advisories") or {}).get("items") or []
+    return sum(
+        1 for a in items
+        if not a.get("isPatched")
+        and str(a.get("severity", "")).lower() in SECURITY_SEVERITIES
+    )
 
 
 def grade_stats(data):
@@ -255,13 +267,13 @@ def grade_stats(data):
     else:
         stats.append((RED if archived else GREEN, "Is Archived", "Yes" if archived else "No"))
 
-    alerts = data.get("has_security_alerts")
-    if alerts is None:
-        stats.append((WHITE, "Security Alerts", "Unknown"))
-    elif alerts:
-        stats.append((RED, "Security Alerts", "Open critical/high alerts"))
+    adv = data.get("unpatched_advisories")
+    if adv is None:
+        stats.append((WHITE, "Security Advisories", "Unknown"))
+    elif adv > 0:
+        stats.append((ORANGE, "Security Advisories", f"{adv} unpatched CVEs"))
     else:
-        stats.append((GREEN, "Security Alerts", "None"))
+        stats.append((GREEN, "Security Advisories", "No unpatched active CVEs found"))
 
     ai = data.get("ai_commit_count")
     if ai is None:

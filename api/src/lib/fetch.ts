@@ -17,6 +17,7 @@ const ALLOWED_HOSTS = new Set([
   'endpoint.apivoid.com',
   'raw.githubusercontent.com',
   'api.deps.dev',
+  'plexus.techlore.tech',
 ])
 
 export interface FetchOpts {

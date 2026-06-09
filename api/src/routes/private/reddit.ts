@@ -1,13 +1,13 @@
 // Subreddit info and top monthly posts
 import { createRoute, z } from '@hono/zod-openapi'
 import { fetchJson } from '@/lib/fetch'
+import { freshSeconds } from '@/lib/cache/freshness'
 import { newApp } from '@/lib/openapi'
 import { ErrorResponse, Ok, SubredditSchema } from '@/schemas'
 
 const app = newApp()
 
-const SUCCESS_TTL = 24 * 60 * 60
-const NEGATIVE_TTL = 60 * 60
+const FRESH_TTL = freshSeconds('reddit')
 
 interface AboutData {
   data?: {
@@ -91,18 +91,13 @@ app.openapi(route, async (c) => {
   const { sub } = c.req.valid('param')
   const aboutUrl = `https://www.reddit.com/r/${sub}/about.json`
   const topUrl = `https://www.reddit.com/r/${sub}/top.json?t=month&limit=10`
-  const data = await c.var.storage.fetch(
-    `reddit:${sub}`,
-    SUCCESS_TTL,
-    NEGATIVE_TTL,
-    async () => {
-      const [about, top] = await Promise.all([
-        fetchJson<AboutData>(aboutUrl, { headers }),
-        fetchJson<PostListing>(topUrl, { headers }),
-      ])
-      return { info: mapInfo(about), posts: mapPosts(top) }
-    },
-  )
+  const data = await c.var.storage.fetch(`reddit:${sub}`, FRESH_TTL, async () => {
+    const [about, top] = await Promise.all([
+      fetchJson<AboutData>(aboutUrl, { headers }),
+      fetchJson<PostListing>(topUrl, { headers }),
+    ])
+    return { info: mapInfo(about), posts: mapPosts(top) }
+  })
   return c.json(data, 200)
 })
 

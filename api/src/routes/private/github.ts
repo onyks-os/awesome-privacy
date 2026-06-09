@@ -2,13 +2,13 @@
 import { createRoute, z } from '@hono/zod-openapi'
 import { fetchJson } from '@/lib/fetch'
 import { githubHeaders } from '@/lib/github'
+import { freshSeconds } from '@/lib/cache/freshness'
 import { newApp } from '@/lib/openapi'
 import { ErrorResponse, GithubRepoSchema, Ok } from '@/schemas'
 
 const app = newApp()
 
-const SUCCESS_TTL = 24 * 60 * 60
-const NEGATIVE_TTL = 60 * 60
+const FRESH_TTL = freshSeconds('github')
 
 interface RepoInfo {
   owner?: { login?: string; avatar_url?: string }
@@ -121,28 +121,23 @@ app.openapi(route, async (c) => {
   const { owner, repo } = c.req.valid('param')
   const slug = `${owner}/${repo}`
   const headers = githubHeaders(c.env.GITHUB_TOKEN)
-  const data = await c.var.storage.fetch(
-    `gh:${slug}`,
-    SUCCESS_TTL,
-    NEGATIVE_TTL,
-    async () => {
-      const base = `https://api.github.com/repos/${slug}`
-      const [info, languages, tags, contributors, commits] = await Promise.all([
-        fetchJson<RepoInfo>(base, { headers }),
-        fetchJson<Record<string, number>>(`${base}/languages`, { headers }),
-        fetchJson<Tag[]>(`${base}/tags`, { headers }),
-        fetchJson<Contributor[]>(`${base}/contributors?per_page=100`, { headers }),
-        fetchJson<Commit[]>(`${base}/commits`, { headers }),
-      ])
-      return {
-        info: mapInfo(info),
-        languages: languages ?? {},
-        versions: tags.map(mapVersion),
-        contributors: contributors.map(mapContributor),
-        commits: commits.map(mapCommit),
-      }
-    },
-  )
+  const data = await c.var.storage.fetch(`gh:${slug}`, FRESH_TTL, async () => {
+    const base = `https://api.github.com/repos/${slug}`
+    const [info, languages, tags, contributors, commits] = await Promise.all([
+      fetchJson<RepoInfo>(base, { headers }),
+      fetchJson<Record<string, number>>(`${base}/languages`, { headers }),
+      fetchJson<Tag[]>(`${base}/tags`, { headers }),
+      fetchJson<Contributor[]>(`${base}/contributors?per_page=100`, { headers }),
+      fetchJson<Commit[]>(`${base}/commits`, { headers }),
+    ])
+    return {
+      info: mapInfo(info),
+      languages: languages ?? {},
+      versions: tags.map(mapVersion),
+      contributors: contributors.map(mapContributor),
+      commits: commits.map(mapCommit),
+    }
+  })
   return c.json(data, 200)
 })
 

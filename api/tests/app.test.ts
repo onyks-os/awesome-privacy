@@ -74,6 +74,18 @@ describe('auth', () => {
   })
 })
 
+describe('middleware scoping', () => {
+  it('public routes are edge cacheable', async () => {
+    const res = await hit('/v1/stats')
+    expect(res.headers.get('cache-control')).toBe('public, s-maxage=300')
+  })
+
+  it('enrich routes are not advertised as public cacheable', async () => {
+    const res = await hit('/v1/enrich/privacy/1')
+    expect(res.headers.get('cache-control') ?? '').not.toContain('public')
+  })
+})
+
 describe('mcp', () => {
   it('lists tools', async () => {
     const res = await hit('/v1/mcp', {

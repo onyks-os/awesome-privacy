@@ -136,7 +136,8 @@ export const ItunesAppSchema = z
   .openapi('ItunesApp', { description: 'iTunes lookup result, passthrough' })
 
 export const AndroidReportSchema = z.object({}).openapi('AndroidReport', {
-  description: 'Exodus Privacy report with resolved trackers',
+  description:
+    'Exodus Privacy trackers merged with Plexus de-Googled compatibility (degoogled)',
 })
 
 export const WebsiteReportSchema = z

@@ -2,13 +2,13 @@
 import { createRoute, z } from '@hono/zod-openapi'
 import { fetchJson } from '@/lib/fetch'
 import { ApiError } from '@/lib/errors'
+import { freshSeconds } from '@/lib/cache/freshness'
 import { newApp } from '@/lib/openapi'
 import { ErrorResponse, ItunesAppSchema, Ok } from '@/schemas'
 
 const app = newApp()
 
-const SUCCESS_TTL = 7 * 24 * 60 * 60
-const NEGATIVE_TTL = 6 * 60 * 60
+const FRESH_TTL = freshSeconds('ios')
 
 interface ItunesResult {
   resultCount: number
@@ -42,19 +42,14 @@ app.openapi(route, async (c) => {
   const id = normalize(bundleId)
   const idParam = /^\d+$/.test(id) ? `id=${id}` : `bundleId=${encodeURIComponent(id)}`
   const upstream = `https://itunes.apple.com/lookup?${idParam}&country=${country}`
-  const data = await c.var.storage.fetch(
-    `ios:${country}:${id}`,
-    SUCCESS_TTL,
-    NEGATIVE_TTL,
-    async () => {
-      const result = await fetchJson<ItunesResult>(upstream)
-      const first = result.results?.[0]
-      if (!result.resultCount || !first) {
-        throw new ApiError('NOT_FOUND', `No app found for '${id}'`, 404)
-      }
-      return first
-    },
-  )
+  const data = await c.var.storage.fetch(`ios:${country}:${id}`, FRESH_TTL, async () => {
+    const result = await fetchJson<ItunesResult>(upstream)
+    const first = result.results?.[0]
+    if (!result.resultCount || !first) {
+      throw new ApiError('NOT_FOUND', `No app found for '${id}'`, 404)
+    }
+    return first
+  })
   return c.json(data, 200)
 })
 

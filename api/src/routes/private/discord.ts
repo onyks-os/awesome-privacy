@@ -1,13 +1,13 @@
 // Discord invite info, projected to a compact response shape
 import { createRoute, z } from '@hono/zod-openapi'
 import { fetchJson } from '@/lib/fetch'
+import { freshSeconds } from '@/lib/cache/freshness'
 import { newApp } from '@/lib/openapi'
 import { DiscordInviteSchema, ErrorResponse, Ok } from '@/schemas'
 
 const app = newApp()
 
-const SUCCESS_TTL = 24 * 60 * 60
-const NEGATIVE_TTL = 60 * 60
+const FRESH_TTL = freshSeconds('discord')
 
 interface Invite {
   code?: string
@@ -51,25 +51,20 @@ app.openapi(route, async (c) => {
   const upstream =
     `https://discord.com/api/v9/invites/${encodeURIComponent(invite)}` +
     '?with_counts=true&with_expiration=true'
-  const data = await c.var.storage.fetch(
-    `discord:${invite}`,
-    SUCCESS_TTL,
-    NEGATIVE_TTL,
-    async () => {
-      const raw = await fetchJson<Invite>(upstream, { headers })
-      const guild = raw.guild
-      return {
-        inviteCode: raw.code ?? null,
-        name: guild?.name ?? null,
-        memberCount: raw.approximate_member_count ?? null,
-        memberOnlineCount: raw.approximate_presence_count ?? null,
-        channel: raw.channel?.name ?? null,
-        icon: iconUrl(guild?.id, guild?.icon),
-        banner: bannerUrl(guild?.id, guild?.splash),
-        inviter: raw.inviter?.global_name ?? null,
-      }
-    },
-  )
+  const data = await c.var.storage.fetch(`discord:${invite}`, FRESH_TTL, async () => {
+    const raw = await fetchJson<Invite>(upstream, { headers })
+    const guild = raw.guild
+    return {
+      inviteCode: raw.code ?? null,
+      name: guild?.name ?? null,
+      memberCount: raw.approximate_member_count ?? null,
+      memberOnlineCount: raw.approximate_presence_count ?? null,
+      channel: raw.channel?.name ?? null,
+      icon: iconUrl(guild?.id, guild?.icon),
+      banner: bannerUrl(guild?.id, guild?.splash),
+      inviter: raw.inviter?.global_name ?? null,
+    }
+  })
   return c.json(data, 200)
 })
 

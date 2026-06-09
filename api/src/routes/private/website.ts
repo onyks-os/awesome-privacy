@@ -2,13 +2,13 @@
 import { createRoute, z } from '@hono/zod-openapi'
 import { fetchJson } from '@/lib/fetch'
 import { ApiError } from '@/lib/errors'
+import { freshSeconds } from '@/lib/cache/freshness'
 import { newApp } from '@/lib/openapi'
 import { ErrorResponse, Ok, WebsiteReportSchema } from '@/schemas'
 
 const app = newApp()
 
-const SUCCESS_TTL = 30 * 24 * 60 * 60
-const NEGATIVE_TTL = 60 * 60
+const FRESH_TTL = freshSeconds('website')
 
 interface ApiVoidResp {
   data?: { report?: unknown }
@@ -38,18 +38,13 @@ app.openapi(route, async (c) => {
   const upstream =
     'https://endpoint.apivoid.com/urlrep/v1/pay-as-you-go/' +
     `?key=${key}&url=${encodeURIComponent(target)}`
-  const data = await c.var.storage.fetch(
-    `website:${host}`,
-    SUCCESS_TTL,
-    NEGATIVE_TTL,
-    async () => {
-      const result = await fetchJson<ApiVoidResp>(upstream, { timeoutMs: 15000 })
-      if (!result?.data?.report) {
-        throw new ApiError('UPSTREAM_ERROR', 'APIVoid did not return a report', 502)
-      }
-      return result.data.report as Record<string, unknown>
-    },
-  )
+  const data = await c.var.storage.fetch(`website:${host}`, FRESH_TTL, async () => {
+    const result = await fetchJson<ApiVoidResp>(upstream, { timeoutMs: 15000 })
+    if (!result?.data?.report) {
+      throw new ApiError('UPSTREAM_ERROR', 'APIVoid did not return a report', 502)
+    }
+    return result.data.report as Record<string, unknown>
+  })
   return c.json(data as Record<string, unknown>, 200)
 })
 
