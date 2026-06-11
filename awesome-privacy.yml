@@ -2259,6 +2259,8 @@ categories:
         [V2ray-core](https://github.com/v2ray/v2ray-core) is a platform for building
         proxies to bypass network restrictions and protect your privacy.
         See [more](https://github.com/hugetiny/awesome-vpn)
+        [TransparentTorProxy](https://github.com/onyks-os/TransparentTorProxy) is a Linux CLI
+        utility that transparently routes all system traffic through the Tor network.
       wordOfWarning: |
         [Malicious Proxies](https://www.defcon.org/images/defcon-17/dc-17-presentations/defcon-17-edward_zaborowski-doppelganger.pdf) are all too common.
         Always use open source software, host it yourself or pay for a reputable cloud service.
